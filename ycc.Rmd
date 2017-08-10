@@ -1,0 +1,170 @@
+---
+title: "An Analysis of the 2017 YCC U20 Boys Tournament"
+date: "8/9/2017"
+output: html_document
+---
+
+We examine the results of the 2016 and 2017 YCC U20 boys tournament. We conculde that the individual games were, on average, more competitive at the expense of the overall fairness of the competition. Top seeds received the majority of the benefit both in terms of increased cometitiveness of games and in terms of gaining unfair advantages in final placement.
+
+## Competitiveness of Games
+
+In this section, we consider various measures of how competitive the YCC Boys U20 games were in 2016 and in 2017. The motivation is that the tournament format was changed in order to increase the competitveness of the games. We start by simply computing the mean point differential in each year:
+
+
+```{r, echo = FALSE}
+sc2017 <- read.csv("2017ScoresFinal", stringsAsFactors = FALSE)
+sc2016 <- read.csv("2016Scores", stringsAsFactors = FALSE)
+top2017 <- unique(as.character(unlist(sc2017[1:12, 1:2])))
+top2016 <- c("BUDA ", "Triforce ", "Nashvillains YCC U19 Open ", "Minnesota Superior A ", "DiscNW ", "ATLiens ", "Chicago YCC U", "Colorado Cutthroat ")
+names(sc2017) <- c("home", "away", "home.score", "away.score")
+```
+
+In 2017, the mean point difference was `r mean(abs(sc2017$home.score - sc2017$away.score))`, an improvement over the 2016 mean difference of `r round(mean(abs(sc2016$home.score - sc2016$away.score)), 2)`. So, games were on average 1.33 points closer in 2017 than in 2016. We note here that many games in 2016 were to 13, which could impact interpretation of the results.
+
+The following table gives the percentage of games that were as close or closer than the number of points indicated in each year in games for which at least one of the teams was seeded in the top 8. For example, in 2016, 1/9 of the games that top 8 seeded teams played were decided by 1 point, while in 2017, 50% of games were decdied by 3 points or less.
+
+```{r, echo = FALSE}
+suppressMessages(library(printr))
+suppressMessages(library(dplyr))
+suppressMessages(library(knitr))
+sc2016Top8 <- filter(sc2016, home %in% top2016 | away %in% top2016)
+sc2017Top8 <- filter(sc2017, home %in% top2017 | away %in% top2017)
+scoresTop2016 <- table(factor(abs(sc2016Top8$home.score - sc2016Top8$away.score), levels = 1:15))
+scoresTop2017 <- table(factor(abs(sc2017Top8$home.score - sc2017Top8$away.score), levels = 1:15))
+cum1 <- cumsum(scoresTop2016/sum(scoresTop2016))
+cum2 <- cumsum(scoresTop2017/sum(scoresTop2017))
+cum <- rbind(cum1, cum2)
+row.names(cum) <- c("2016", "2017")
+kable(cum, digits = 2)
+#sc2016Rest <- filter(sc2016,! ((home %in% top2016) & (away %in% top2016)))
+#sc2017Rest <- filter(sc2017,! ((home %in% top2017) & (away %in% top2017)))
+t2016 <-  table(factor(abs(sc2016$home.score - sc2016$away.score), levels = 1:15))
+t2017 <- table(factor(abs(sc2017$home.score - sc2017$away.score), levels = 1:15))
+c1 <- cumsum(t2016/sum(t2016))
+c2 <- cumsum(t2017/sum(t2017))
+c3 <- rbind(c1, c2)
+row.names(c3) <- c("2016", "2017")
+
+```
+
+So, it is pretty clear that the top 8 seeds were involved in closer games in 2017 than in 2016. Here is a similar table for *all* games.
+
+
+```{r, echo = FALSE}
+kable(c3, digits = 2)
+```
+
+Again, it is clear that there were more games decided by fewer points in 2017 than in 2016. However, the gains for all teams are not as pronounced as the gains for the top 8 teams, who were involved in more games (percentage-wise) that were close than teams overall in 2017. The figure below summarizes the tables. In a tournament in which every game was decided by 1 point, the graph would be constant along the top. The closer the graph is to constant 1, the more competitive the tournament games were, and the area between two graphs can give an indication of the relative competitiveness of games at a tournament.
+
+```{r, echo = FALSE}
+forPlot <- rbind(c3, cum)
+forPlot <- data.frame(t(forPlot))
+names(forPlot) <- c( "All_2016", "All_2017", "Top_8_2016", "Top_8_2017")
+forPlot <- suppressMessages(reshape2::melt(forPlot))
+library(ggplot2)
+forPlot$Difference <- 1:15
+names(forPlot)[1] <- "Year"
+ggplot(forPlot, aes(x = Difference, y = value)) + geom_line(aes(color = Year)) +
+  ylab("Percent of Games") +
+  xlab("Score Difference") 
+  
+```
+
+This graph makes it clear that the primary beneficiaries of the change were the top 8 seeded teams, who were involved in less competitive games than the typical team in 2016, but in more competitive games than the typical team in 2017.
+
+Next, we consider the earth mover distance transport function between the two distributions in the above table. In this context, it describes the number and type of games that would have to be different in order for the distributions of point differentials in scores to be the same in each year. Since we want to see how much better the new format did at having close games, we do not count moving scores from closer in 2016 to further in 2017, but we do count moving from further in 2016 to closer in 2017. 
+
+```{r, echo = FALSE}
+a <- as.vector(table(factor(abs(sc2016$home.score - sc2016$away.score), levels = 1:15)))
+b <- as.vector(table(factor(abs(sc2017$home.score - sc2017$away.score), levels = 1:15)))
+costm <- matrix(rep(0, 225), nrow = 15)
+for(i in 1:15) for(j in 1:15) costm[i,j] <- max(i - j, 0)
+costm <- t(costm)
+suppressMessages(library(transport))
+out <- suppressWarnings(transport(a, b, costm))
+out
+```
+
+This is telling us that, in order for the distribution of differences in scores to be the same, we woule need to leave a large bit of games that were decided by 1 point in 2016 as being decided by 1 point in 2017, move an 8 point difference in 2016 to a 1 point difference in 2017, move a considerable number of games decided by 3 points to games decided by 2 points, and so on. In order to interpret this, I am considering the following changes as definitely significant:
+
+1. 8 to 1
+1. 4 to 2
+1. 13 to 2
+1. 10 to 3
+1. 11 to 3
+1. 12 to 7
+
+and the following changes as possibly signficant (where here, I mean that a player would notice the difference in the competitiveness of a game if the point differential changed from 8 to 1, but only possibly notice if it changed from 3 to 2).
+
+1. 3 to 2
+1. 7 to 4
+1. 9 to 6
+1. 11 to 7
+
+With this in mind, we get a minimum of about `r round(sum(out$mass[c(2, 5, 6, 7, 8, 19)])* 100)` percent of the games would most likely seem more competitive, and a maximum of about `r round(sum(out$mass[c(2, 4, 5, 6, 7, 8, 10, 14, 18, 19)])* 100)` percent of the games would possibly seem more competitive. 
+
+
+
+## Competitive Fairness
+
+One of the reasons for having a tournament and bringing teams in from across the country is to decide a champion. If teams are going to come a long distance at great cost to play, then they want the set-up of the tournament to pass a "competitive fairness" test. It is a bit tricky to say what exactly this means, though. Teams that were unhappy with the change of tournament format noted that seeding became very important. For example, teams seeded 17th-30th are ineligible to win the champtionship, while teams seeded 1-8 are guaranteed to finish in the top 16. In addition, a team mis-seeded in the 25-30 range would not be eligible to play a team seeded in the 1-8 range throughout the course of the tournament. Thus, a mis-seeded team could end up not knowing how they compare to teams that may (or may not) be their peers on the field. 
+
+Moreover, a team seeded 25-30 cannot finish higher than 17th, and if previous year finish is used for the next year's seeding (as seems to have been done this year), a team seeded 25-30 would be automatically ineligible for the 2017 championship **and** the 2018 championship. A team seeded 9-16 that does poorly will not only (rightly) be eliminated from the 2017 championship game, but will also be eliminated from contention for a championship in **2018**. Meanwhile, a team seeded 8th could lose all of their games and finish 16th, still eligible for the championship in 2018. It happened this year that the 16th place finisher lost all of their games, while the 17th place finisher won all of theirs, and it is a natural question as to whether that is fair. 
+
+As a stand-in for fairness, I am proposing the following. Suppose you take all of the results from the tournament, and you use those results to generate rankings of the teams via computer simulation. (In this scenario, each game counts the same; whether it is a pool play game or an elimination game. I know that isn't perfect.) There are several "off-the-shelf" team rankers, and I ran the results from 2016 and 2017 through one of them. Here were the computer models rankings of the teams versus the tournament finish in 2016:
+
+```{r, echo = FALSE}
+names(sc2016)[3:4] <- c("home.response", "away.response")
+names(sc2017)[3:4] <- c("home.response", "away.response")
+#my.mod <- mvglmmRank(sc2016, home.field = FALSE, method = "PB0")
+load("modelsforYCC2")
+forPrint <- data.frame(Computer = names(my.mod$b.ratings)[sort(my.mod$b.ratings, decreasing = TRUE, index.return = TRUE)$ix], Actual = read.csv("~/standings", header = FALSE))
+names(forPrint)[2] <- "Actual"
+forPrint
+```
+
+
+
+
+The following teams' computer ranking is at least 3 different from their tournament finish:
+
+1. Insomnia (-8),
+1. Chicago (-4).
+1. Carolina (+4),
+1. Superior B (+3), and
+1. Texas Two Step (+3).
+
+Insomnia won 1 game, against Charlotte Flight in pool play, but finished 4th in Pool A due to point differential. Note that their single win against Charlotte in 2016 gave them a coveted top 16 seed in 2017.  It is also interesting that this ranking anticipated the overseeding of Insomnia and Chicago in 2017, as well as the underseeding of Two Step. Superior (B) was correctly seeded in 2017, but Carolina was overseeded. 
+
+Next, we have the same information from 2017.
+
+
+```{r, echo = FALSE}
+#my.mod2017 <- mvglmmRank(sc2017, home.field = FALSE, method = "PB0")
+#save(my.mod, my.mod2017, file = "modelsforYCC2")
+forPrint2 <- data.frame(Computer = names(my.mod2017$b.ratings)[sort(my.mod2017$b.ratings, decreasing = TRUE, index.return = TRUE)$ix], Actual = read.csv("~/standings2", header = FALSE))
+names(forPrint2)[2] <- "Actual"
+forPrint3 <- data.frame(Team = c("Austin", "ATLiens", "Rising Tide", "Minnesota", "Chicago",  "Valley", "Forge", "Flying Pig", "Nashville"), Departure = c(13, -8, 8, -8, -7, 6, 5, -4, -4))
+forPrint2
+```
+
+1. Austin +13,  
+1. Rising Tide +8,  
+1. Carolina Sky +8,  
+1. Minnesota A -8
+1. ATLiens -8
+1. Chicago -7
+1. Valley Ultimate +6
+1. Forge +5
+1. Flying Pig -4
+1. Nashville -4
+
+The variation in computer ranking and tournament finish is much higher in the current set-up, with the computer algorithm placing Austin 4th(!) and Forge 7th(!). This is evidence that the tournament format from 2017 does not adequately determine which teams are strongest. I do not submit that the computer rankings are better, only that there is reasonable doubt as to whether Austin would have won against DEVYL, or Forge against BUDA. A tournament that on its face treats some teams differently than others should have a high standard that their treatment is legitimate. My personal standard is the following: the probability that the best team that was ineligible for the championship beats the crowned champion in a single game should be small. Of course, it is impossible to know this probability, but we can enter the results of all the games into a computer model and estimate the probability. My personal number is that the probability should be less than 5%; preferably less than 1%. Others might disagree.
+
+The computer model puts the probability that Austin would beat Triforce in a single game at **30.7%**, and predicts a final score of 14-12 for Triforce. Philadelphia, on the other hand, is modeled as having a 13% chance of winning, with a predicted final score of 15-11. Basic fairness dictates that a team with a best estimate (with non-informative prior) of 30% chance of beating the actual champion should have been allowed a path to the championship. Other models would indicate different probabilities for these games, but the fact remains that there was an undefeated team (Austin) that at least one standard computer algorithm gives a 30% chance of beating the named champion, but wasn't given a path to the championship. 
+
+
+
+##Summary
+
+The 2017 YCC tournament increased competitveness in somewhere between 10 and 30 per cent of the games played, at the cost of significantly increasing the uncertainty of correctly determining teams' strength relative to the rest of the field. The benefits of the change were primarily for those teams seeded 1-8, who saw many more competitive games, while being able to still compete for the championship. Those teams also were unlikely to place lower in the tournament than the computer algorithm suggests. The lower seeded teams also saw some improvement in the competitiveness of games (but less than the top seeds), at the cost of being able to place as high as their scores indicate they might be able to. 
